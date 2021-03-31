@@ -10,7 +10,8 @@ import {
   FRBModel,
   VariableMeshModel,
   WidgytsCanvasModel,
-  WidgytsCanvasView
+  WidgytsCanvasView,
+  FieldArrayModel
 } from './widgyts';
 
 import { MODULE_NAME, MODULE_VERSION } from './version';
@@ -28,7 +29,8 @@ const widgytsPlugin: JupyterFrontEndPlugin<void> = {
         FRBModel,
         VariableMeshModel,
         WidgytsCanvasModel,
-        WidgytsCanvasView
+        WidgytsCanvasView,
+        FieldArrayModel
       }
     });
   },

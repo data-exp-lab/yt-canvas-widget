@@ -58,7 +58,7 @@ class TestWidgytsCanvasViewer(TestCase):
         assert array_equal(py, vm._py)
         assert array_equal(pdx, vm._pdx)
         assert array_equal(pdy, vm._pdy)
-        assert array_equal(val, vm._val)
+        assert array_equal(val, vm.field_values[0]._array)
 
 
 class TestControls(TestCase):

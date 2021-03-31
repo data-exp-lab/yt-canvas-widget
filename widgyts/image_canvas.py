@@ -20,6 +20,19 @@ from . import EXTENSION_VERSION
 
 
 @ipywidgets.register
+class FieldArrayModel(ipywidgets.Widget):
+    _model_name = traitlets.Unicode("FieldArrayModel").tag(sync=True)
+    _model_module = traitlets.Unicode("@yt-project/yt-widgets").tag(sync=True)
+    _model_module_version = traitlets.Unicode(EXTENSION_VERSION).tag(sync=True)
+    field_name = traitlets.Unicode("").tag(sync=True)
+    array = traitlets.Bytes(allow_none=False).tag(sync=True, **bytes_serialization)
+
+    @property
+    def _array(self):
+        return np.frombuffer(self.array, dtype="f8")
+
+
+@ipywidgets.register
 class VariableMeshModel(ipywidgets.Widget):
     _model_name = traitlets.Unicode("VariableMeshModel").tag(sync=True)
     _model_module = traitlets.Unicode("@yt-project/yt-widgets").tag(sync=True)
@@ -28,7 +41,10 @@ class VariableMeshModel(ipywidgets.Widget):
     py = traitlets.Bytes(allow_none=False).tag(sync=True, **bytes_serialization)
     pdx = traitlets.Bytes(allow_none=False).tag(sync=True, **bytes_serialization)
     pdy = traitlets.Bytes(allow_none=False).tag(sync=True, **bytes_serialization)
-    val = traitlets.Bytes(allow_none=False).tag(sync=True, **bytes_serialization)
+    data_source = traitlets.Any(allow_none=True).tag(sync=False)
+    field_values = traitlets.List(trait=traitlets.Instance(FieldArrayModel)).tag(
+        sync=True, **widget_serialization
+    )
 
     @property
     def _px(self):
@@ -46,9 +62,19 @@ class VariableMeshModel(ipywidgets.Widget):
     def _pdy(self):
         return np.frombuffer(self.pdy, dtype="f8")
 
-    @property
-    def _val(self):
-        return np.frombuffer(self.val, dtype="f8")
+    def add_field(self, field_name):
+        if (
+            any(_.field_name == field_name for _ in self.field_values)
+            or self.data_source is None
+        ):
+            return
+        v = self.data_source[field_name]
+        new_field = FieldArrayModel(field_name=field_name, array=v.tobytes())
+        new_field_values = self.field_values + [new_field]
+        # Do an update of the trait!
+        self.field_values = new_field_values
+        mi, ma = v.min(), v.max()
+        return mi, ma
 
 
 @ipywidgets.register
@@ -127,6 +153,7 @@ class WidgytsCanvasViewer(ipycanvas.Canvas):
     colormaps = traitlets.Instance(ColormapContainer).tag(
         sync=True, **widget_serialization
     )
+    current_field = traitlets.Unicode("ones", allow_none=False).tag(sync=True)
     frb_model = traitlets.Instance(FRBModel).tag(sync=True, **widget_serialization)
     variable_mesh_model = traitlets.Instance(VariableMeshModel).tag(
         sync=True, **widget_serialization
@@ -138,6 +165,14 @@ class WidgytsCanvasViewer(ipycanvas.Canvas):
     _view_name = traitlets.Unicode("WidgytsCanvasView").tag(sync=True)
     _view_module = traitlets.Unicode("@yt-project/yt-widgets").tag(sync=True)
     _view_module_version = traitlets.Unicode(EXTENSION_VERSION).tag(sync=True)
+
+    @traitlets.observe("current_field")
+    def _current_field_changed(self, change):
+        if change["new"] in self.variable_mesh_model.field_values:
+            return
+        rv = self.variable_mesh_model.add_field(change["new"])
+        if rv is not None:
+            self.min_val, self.max_val = rv
 
     @traitlets.default("layout")
     def _layout_default(self):
@@ -181,8 +216,13 @@ class WidgytsCanvasViewer(ipycanvas.Canvas):
             description="colormap",
             value="viridis",
         )
-        mi = self.variable_mesh_model._val.min()
-        ma = self.variable_mesh_model._val.max()
+        vals = [
+            _
+            for _ in self.variable_mesh_model.field_values
+            if _.field_name == self.current_field
+        ][0]._array
+        mi = vals.min()
+        ma = vals.max()
         min_val = ipywidgets.BoundedFloatText(
             description="lower colorbar bound:", value=mi, min=mi, max=ma
         )
@@ -274,8 +314,9 @@ class WidgytsCanvasViewer(ipycanvas.Canvas):
     @classmethod
     def from_obj(cls, obj, field="density"):
         vm = {_: obj[_].tobytes() for _ in ("px", "py", "pdx", "pdy")}
-        vm["val"] = obj[field].tobytes()
-        vmm = VariableMeshModel(**vm)
+        # Bootstrap our field array model
+        fv = [FieldArrayModel(field_name=field, array=obj[field].tobytes())]
+        vmm = VariableMeshModel(**vm, data_source=obj, field_values=fv)
         frb = FRBModel(variable_mesh_model=vmm)
         cmc = ColormapContainer()
         mi, ma = obj[field].min(), obj[field].max()
@@ -285,6 +326,7 @@ class WidgytsCanvasViewer(ipycanvas.Canvas):
             frb_model=frb,
             variable_mesh_model=vmm,
             colormaps=cmc,
+            current_field=field,
         )
         return wc
 

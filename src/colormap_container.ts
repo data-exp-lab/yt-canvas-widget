@@ -1,7 +1,6 @@
 import { WidgetModel } from '@jupyter-widgets/base';
-import { ColormapCollection } from '@data-exp-lab/yt-tools';
 import { MODULE_NAME, MODULE_VERSION } from './version';
-const yt_tools = await import('@data-exp-lab/yt-tools');
+import { yt_tools, ColormapCollection } from './utils';
 
 export class ColormapContainerModel extends WidgetModel {
   defaults(): any {

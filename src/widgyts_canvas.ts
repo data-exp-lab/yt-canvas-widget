@@ -22,6 +22,7 @@ export class WidgytsCanvasModel extends CanvasModel {
       colormaps: null,
       frb_model: null,
       variable_mesh_model: null,
+      current_field: 'ones',
       image_bitmap: undefined,
       image_data: undefined,
       _dirty_frb: false,
@@ -35,6 +36,7 @@ export class WidgytsCanvasModel extends CanvasModel {
     this.frb_model = this.get('frb_model');
     this.variable_mesh_model = this.get('variable_mesh_model');
     this.colormaps = this.get('colormaps');
+    this.current_field = this.get('current_field');
   }
 
   static serializers: ISerializers = {
@@ -51,6 +53,7 @@ export class WidgytsCanvasModel extends CanvasModel {
   frb_model: FRBModel;
   variable_mesh_model: VariableMeshModel;
   colormaps: ColormapContainerModel;
+  current_field: string;
   _dirty_frb: boolean;
   _dirty_bitmap: boolean;
 
@@ -108,10 +111,18 @@ export class WidgytsCanvasView extends CanvasView {
       this.dirtyBitmap,
       this
     );
+    this.model.on('change:current_field', this.updateCurrentField, this);
     this.el.addEventListener('wheel', this.conductZoom.bind(this));
     this.el.addEventListener('mousedown', this.startDrag.bind(this));
     this.el.addEventListener('mousemove', this.conductDrag.bind(this));
     window.addEventListener('mouseup', this.endDrag.bind(this));
+  }
+
+  async updateCurrentField(): Promise<void> {
+    this.model.current_field = this.model.get('current_field');
+    this.dirtyBitmap();
+    this.dirtyFRB();
+    return this.updateBitmap();
   }
 
   conductZoom(event: WheelEvent): void {
@@ -227,7 +238,10 @@ export class WidgytsCanvasView extends CanvasView {
   }
 
   regenerateBuffer(): void {
-    this.model.frb_model.depositDataBuffer(this.model.variable_mesh_model);
+    this.model.frb_model.depositDataBuffer(
+      this.model.variable_mesh_model,
+      this.model.current_field
+    );
     this.model.set('_dirty_frb', false);
     this.model.set('_dirty_bitmap', true);
   }

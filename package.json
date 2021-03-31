@@ -59,7 +59,7 @@
     "watch:src": "tsc -w"
   },
   "dependencies": {
-    "@data-exp-lab/yt-tools": "^0.3.0",
+    "@data-exp-lab/yt-tools": "^0.4.1",
     "@jupyterlab/application": "^3.0.4",
     "@jupyterlab/coreutils": "^5.0.2",
     "@jupyterlab/mainmenu": "^3.0.3",
